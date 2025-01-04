@@ -3,6 +3,8 @@ from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, No
 from urllib.parse import urlparse, parse_qs
 from googletrans import Translator, LANGUAGES
 import os
+from flask import redirect
+from flask import url_for
 
 app = Flask(__name__)
 translator = Translator()
