@@ -88,53 +88,107 @@ html_template = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Transcript Fetcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            max-width: 800px;
+            margin: 2rem auto;
+            background: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #444;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 1rem;
+        }
+        input, select, textarea, button {
+            width: 100%;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        textarea {
+            resize: none;
+        }
+        .error {
+            color: red;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>YouTube Transcript Fetcher</h1>
-    <form action="/" method="POST">
-        <label for="url">Enter YouTube URL:</label>
-        <input type="text" id="url" name="url" value="{{ video_url or '' }}" required><br><br>
+    <div class="container">
+        <h1>YouTube Transcript Fetcher</h1>
+        <form action="/" method="POST">
+            <label for="url">Enter YouTube URL:</label>
+            <input type="text" id="url" name="url" value="{{ video_url or '' }}" required>
 
-        <label for="language">Select Preferred Language:</label>
-        <select id="language" name="language" required>
-            {% for lang in languages %}
-            <option value="{{ lang }}" {% if lang == 'en' %}selected{% endif %}>{{ lang }}</option>
-            {% endfor %}
-        </select><br><br>
+            <label for="language">Select Preferred Language:</label>
+            <select id="language" name="language" required>
+                {% for lang in languages %}
+                <option value="{{ lang }}" {% if lang == 'en' %}selected{% endif %}>{{ lang }}</option>
+                {% endfor %}
+            </select>
 
-        <label for="target_language">Select Target Language for Translation:</label>
-        <select id="target_language" name="target_language" required>
-            {% for code, lang in languages.items() %}
-            <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ lang }}</option>
-            {% endfor %}
-        </select><br><br>
+            <label for="target_language">Select Target Language for Translation:</label>
+            <select id="target_language" name="target_language" required>
+                {% for code, lang in languages.items() %}
+                <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ lang }}</option>
+                {% endfor %}
+            </select>
 
-        <button type="submit">Fetch Transcript</button>
-    </form>
+            <button type="submit">Fetch Transcript</button>
+        </form>
 
-    {% if transcript %}
-    <h2>Transcript:</h2>
-    <textarea rows="10" cols="100" readonly>{{ transcript }}</textarea><br><br>
-    <form action="/download" method="POST">
-        <input type="hidden" name="content" value="{{ transcript }}">
-        <input type="hidden" name="file_name" value="Transcript">
-        <button type="submit">Download Transcript</button>
-    </form>
-    {% endif %}
+        {% if transcript %}
+        <h2>Transcript:</h2>
+        <textarea rows="10" readonly>{{ transcript }}</textarea>
+        <form action="/download" method="POST">
+            <input type="hidden" name="content" value="{{ transcript }}">
+            <input type="hidden" name="file_name" value="Transcript">
+            <button type="submit">Download Transcript</button>
+        </form>
+        {% endif %}
 
-    {% if translated_transcript %}
-    <h2>Translated Transcript:</h2>
-    <textarea rows="10" cols="100" readonly>{{ translated_transcript }}</textarea><br><br>
-    <form action="/download" method="POST">
-        <input type="hidden" name="content" value="{{ translated_transcript }}">
-        <input type="hidden" name="file_name" value="Translated_Transcript">
-        <button type="submit">Download Translated Transcript</button>
-    </form>
-    {% endif %}
+        {% if translated_transcript %}
+        <h2>Translated Transcript:</h2>
+        <textarea rows="10" readonly>{{ translated_transcript }}</textarea>
+        <form action="/download" method="POST">
+            <input type="hidden" name="content" value="{{ translated_transcript }}">
+            <input type="hidden" name="file_name" value="Translated_Transcript">
+            <button type="submit">Download Translated Transcript</button>
+        </form>
+        {% endif %}
 
-    {% if error %}
-    <p style="color:red">{{ error }}</p>
-    {% endif %}
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+    </div>
 </body>
 </html>
 """
