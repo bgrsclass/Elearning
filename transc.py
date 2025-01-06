@@ -1,197 +1,154 @@
-from flask import Flask, render_template_string, request, send_file
+import cherrypy
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from urllib.parse import urlparse, parse_qs
 from googletrans import Translator, LANGUAGES
+from cherrypy.lib import static
 import os
-from flask import redirect
-from flask import url_for
 
-app = Flask(__name__)
+# Initialize Google Translator
 translator = Translator()
 
-# Ensure the downloads directory exists
-os.makedirs("downloads", exist_ok=True)
-
+# Utility function to get available languages for a given video
 def get_available_languages(video_id):
     try:
         languages = YouTubeTranscriptApi.list_transcripts(video_id)
         return [language.language_code for language in languages]
     except Exception as e:
-        return []
+        raise Exception(f"Error fetching available languages: {e}")
 
-def get_transcript(video_id, preferred_language):
+# Fetch transcript logic
+def get_transcript(video_url, preferred_language):
     try:
-        available_languages = get_available_languages(video_id)
-        if preferred_language not in available_languages:
-            raise ValueError("Transcript not available in the selected language.")
-        
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[preferred_language])
-        transcript_text = ". ".join(item['text'] for item in transcript)
-        return transcript_text
-    except TranscriptsDisabled:
-        return "Transcripts are disabled for this video."
-    except NoTranscriptFound:
-        return "No transcript found for this video in the selected language."
-    except Exception as e:
-        return f"An error occurred: {e}"
-
-def translate_transcript(content, target_language):
-    try:
-        translated = translator.translate(content, dest=target_language)
-        return translated.text
-    except Exception as e:
-        return f"An error occurred during translation: {e}"
-
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        video_url = request.form.get("url")
-        preferred_language = request.form.get("language").strip().lower()
-        target_language = request.form.get("target_language").strip().lower()
-
-        # Extract video ID
         parsed_url = urlparse(video_url)
         if "youtu.be" in parsed_url.netloc:
             video_id = parsed_url.path.lstrip("/")
         elif "youtube.com" in parsed_url.netloc:
             video_id = parse_qs(parsed_url.query).get('v', [None])[0]
         else:
-            return render_template_string(html_template, error="Invalid YouTube URL format")
+            raise ValueError("Invalid YouTube URL format")
+        if not video_id:
+            raise ValueError("Video ID could not be extracted from the URL")
 
-        # Fetch Transcript
-        transcript = get_transcript(video_id, preferred_language)
+        available_languages = get_available_languages(video_id)
+        if not available_languages:
+            raise ValueError("No available languages for the transcript")
+        if preferred_language not in available_languages:
+            raise ValueError(f"Transcript not available in the selected language: {preferred_language}")
 
-        # Translate Transcript
-        translated_transcript = translate_transcript(transcript, target_language)
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[preferred_language])
+        transcript_text = ". ".join(item['text'] for item in transcript)
+        return transcript_text
+    except TranscriptsDisabled:
+        raise Exception("Transcripts are disabled for this video.")
+    except NoTranscriptFound:
+        raise Exception("No transcript found for this video in the selected language.")
+    except Exception as e:
+        raise Exception(f"An error occurred: {e}")
 
-        # Provide options for download
-        return render_template_string(html_template, transcript=transcript, translated_transcript=translated_transcript,
-                                      languages=LANGUAGES, video_url=video_url, target_language=target_language)
+# Translate transcript logic
+def translate_transcript(transcript_content, target_language_name):
+    target_language_code = None
+    for code, name in LANGUAGES.items():
+        if name.lower() == target_language_name:
+            target_language_code = code
+            break
 
-    return render_template_string(html_template, languages=LANGUAGES)
+    if not target_language_code:
+        raise ValueError("Invalid target language selected")
 
-@app.route("/download", methods=["POST"])
-def download():
-    content = request.form.get("content")
-    file_name = request.form.get("file_name")
-    if content:
-        file_path = os.path.join("downloads", f"{file_name}.txt")
-        with open(file_path, "w", encoding="utf-8") as file:
-            file.write(content)
-        return send_file(file_path, as_attachment=True)
-    return redirect(url_for("index"))
+    try:
+        translated = translator.translate(transcript_content, dest=target_language_code)
+        return translated.text
+    except Exception as e:
+        raise Exception(f"An error occurred during translation: {e}")
 
-html_template = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Transcript Fetcher</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            width: 80%;
-            max-width: 800px;
-            margin: 2rem auto;
-            background: #fff;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #444;
-        }
-        label {
-            font-weight: bold;
-            display: block;
-            margin-top: 1rem;
-        }
-        input, select, textarea, button {
-            width: 100%;
-            margin-top: 0.5rem;
-            padding: 0.5rem;
-            font-size: 1rem;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #007BFF;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        textarea {
-            resize: none;
-        }
-        .error {
-            color: red;
-            margin-top: 1rem;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>YouTube Transcript Fetcher</h1>
-        <form action="/" method="POST">
-            <label for="url">Enter YouTube URL:</label>
-            <input type="text" id="url" name="url" value="{{ video_url or '' }}" required>
+# CherryPy Web Application Class
+class TranscriptFetcherApp:
+    @cherrypy.expose
+    def index(self):
+        return '''
+            <html>
+                <head><title>YouTube Transcript Fetcher</title></head>
+                <body>
+                    <h2>Enter YouTube URL:</h2>
+                    <form method="get" action="fetch_transcript">
+                        <input type="text" name="video_url" placeholder="Enter URL here" required>
+                        <br><br>
+                        <label for="language">Select Preferred Language:</label>
+                        <select name="preferred_language" required>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <!-- Add more languages as needed -->
+                        </select>
+                        <br><br>
+                        <input type="submit" value="Fetch Transcript">
+                    </form>
+                </body>
+            </html>
+        '''
+    
+    @cherrypy.expose
+    def fetch_transcript(self, video_url, preferred_language):
+        try:
+            transcript = get_transcript(video_url, preferred_language)
+            return f'''
+                <html>
+                    <head><title>Transcript</title></head>
+                    <body>
+                        <h2>Transcript:</h2>
+                        <p>{transcript}</p>
+                        <form method="get" action="translate_transcript">
+                            <textarea name="transcript" style="width:100%; height:200px;">{transcript}</textarea>
+                            <br><br>
+                            <label for="target_language">Select Target Language for Translation:</label>
+                            <select name="target_language" required>
+                                <option value="en">English</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                                <!-- Add more languages as needed -->
+                            </select>
+                            <br><br>
+                            <input type="submit" value="Translate">
+                        </form>
+                    </body>
+                </html>
+            '''
+        except Exception as e:
+            return f'<h2>Error: {e}</h2>'
+    
+    @cherrypy.expose
+    def translate_transcript(self, transcript, target_language):
+        try:
+            translated_text = translate_transcript(transcript, target_language)
+            return f'''
+                <html>
+                    <head><title>Translated Transcript</title></head>
+                    <body>
+                        <h2>Translated Transcript:</h2>
+                        <p>{translated_text}</p>
+                        <form method="get" action="download">
+                            <textarea name="file_content" style="width:100%; height:200px;">{translated_text}</textarea>
+                            <br><br>
+                            <input type="submit" value="Download Translated Text">
+                        </form>
+                    </body>
+                </html>
+            '''
+        except Exception as e:
+            return f'<h2>Error: {e}</h2>'
+    
+    @cherrypy.expose
+    def download(self, file_content):
+        try:
+            file_path = '/tmp/transcript.txt'  # Temporary file path
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(file_content)
+            cherrypy.response.headers['Content-Type'] = 'text/plain'
+            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="translated_transcript.txt"'
+            return open(file_path, 'r')
+        except Exception as e:
+            return f'<h2>Error: {e}</h2>'
 
-            <label for="language">Select Preferred Language:</label>
-            <select id="language" name="language" required>
-                {% for lang in languages %}
-                <option value="{{ lang }}" {% if lang == 'en' %}selected{% endif %}>{{ lang }}</option>
-                {% endfor %}
-            </select>
-
-            <label for="target_language">Select Target Language for Translation:</label>
-            <select id="target_language" name="target_language" required>
-                {% for code, lang in languages.items() %}
-                <option value="{{ code }}" {% if code == 'en' %}selected{% endif %}>{{ lang }}</option>
-                {% endfor %}
-            </select>
-
-            <button type="submit">Fetch Transcript</button>
-        </form>
-
-        {% if transcript %}
-        <h2>Transcript:</h2>
-        <textarea rows="10" readonly>{{ transcript }}</textarea>
-        <form action="/download" method="POST">
-            <input type="hidden" name="content" value="{{ transcript }}">
-            <input type="hidden" name="file_name" value="Transcript">
-            <button type="submit">Download Transcript</button>
-        </form>
-        {% endif %}
-
-        {% if translated_transcript %}
-        <h2>Translated Transcript:</h2>
-        <textarea rows="10" readonly>{{ translated_transcript }}</textarea>
-        <form action="/download" method="POST">
-            <input type="hidden" name="content" value="{{ translated_transcript }}">
-            <input type="hidden" name="file_name" value="Translated_Transcript">
-            <button type="submit">Download Translated Transcript</button>
-        </form>
-        {% endif %}
-
-        {% if error %}
-        <p class="error">{{ error }}</p>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
-
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    cherrypy.quickstart(TranscriptFetcherApp())
