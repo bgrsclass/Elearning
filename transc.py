@@ -1,22 +1,45 @@
-import cherrypy
+import streamlit as st
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from urllib.parse import urlparse, parse_qs
 from googletrans import Translator, LANGUAGES
-from cherrypy.lib import static
-import os
+import requests
 
 # Initialize Google Translator
 translator = Translator()
 
-# Utility function to get available languages for a given video
+# YouTube Data API Key
+API_KEY = "AIzaSyA_srtTBUZZEneYzB1Lj1In3D0H5rD9l14"
+
+# Function to fetch video details using YouTube Data API
+def fetch_video_details(api_key, video_id):
+    try:
+        url = f"https://www.googleapis.com/youtube/v3/videos?part=snippet&id={video_id}&key={api_key}"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        if "items" in data and data["items"]:
+            snippet = data["items"][0]["snippet"]
+            title = snippet["title"]
+            description = snippet["description"]
+            thumbnails = snippet["thumbnails"].get("high", {}).get("url")
+            return title, description, thumbnails
+        else:
+            raise ValueError("No video details found for the given ID")
+    except Exception as e:
+        st.error(f"An error occurred while fetching video details: {e}")
+        return None, None, None
+
+# Function to fetch available transcript languages
 def get_available_languages(video_id):
     try:
         languages = YouTubeTranscriptApi.list_transcripts(video_id)
         return [language.language_code for language in languages]
     except Exception as e:
-        raise Exception(f"Error fetching available languages: {e}")
+        st.error(f"An error occurred while fetching available languages: {e}")
+        return []
 
-# Fetch transcript logic
+# Function to fetch the transcript
 def get_transcript(video_url, preferred_language):
     try:
         parsed_url = urlparse(video_url)
@@ -36,119 +59,76 @@ def get_transcript(video_url, preferred_language):
             raise ValueError(f"Transcript not available in the selected language: {preferred_language}")
 
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[preferred_language])
-        transcript_text = ". ".join(item['text'] for item in transcript)
-        return transcript_text
+        paragraph = ". ".join(item['text'] for item in transcript)
+        return paragraph
     except TranscriptsDisabled:
-        raise Exception("Transcripts are disabled for this video.")
+        st.error("Transcripts are disabled for this video.")
     except NoTranscriptFound:
-        raise Exception("No transcript found for this video in the selected language.")
+        st.error("No transcript found for this video in the selected language.")
     except Exception as e:
-        raise Exception(f"An error occurred: {e}")
+        st.error(f"An error occurred: {e}")
 
-# Translate transcript logic
+# Function to translate the transcript
 def translate_transcript(transcript_content, target_language_name):
     target_language_code = None
     for code, name in LANGUAGES.items():
-        if name.lower() == target_language_name:
+        if name.lower() == target_language_name.lower():
             target_language_code = code
             break
 
     if not target_language_code:
-        raise ValueError("Invalid target language selected")
+        st.error("Invalid target language selected")
+        return ""
 
     try:
         translated = translator.translate(transcript_content, dest=target_language_code)
         return translated.text
     except Exception as e:
-        raise Exception(f"An error occurred during translation: {e}")
+        st.error(f"An error occurred during translation: {e}")
+        return ""
 
-# CherryPy Web Application Class
-class TranscriptFetcherApp:
-    @cherrypy.expose
-    def index(self):
-        return '''
-            <html>
-                <head><title>YouTube Transcript Fetcher</title></head>
-                <body>
-                    <h2>Enter YouTube URL:</h2>
-                    <form method="get" action="fetch_transcript">
-                        <input type="text" name="video_url" placeholder="Enter URL here" required>
-                        <br><br>
-                        <label for="language">Select Preferred Language:</label>
-                        <select name="preferred_language" required>
-                            <option value="en">English</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <!-- Add more languages as needed -->
-                        </select>
-                        <br><br>
-                        <input type="submit" value="Fetch Transcript">
-                    </form>
-                </body>
-            </html>
-        '''
-    
-    @cherrypy.expose
-    def fetch_transcript(self, video_url, preferred_language):
-        try:
-            transcript = get_transcript(video_url, preferred_language)
-            return f'''
-                <html>
-                    <head><title>Transcript</title></head>
-                    <body>
-                        <h2>Transcript:</h2>
-                        <p>{transcript}</p>
-                        <form method="get" action="translate_transcript">
-                            <textarea name="transcript" style="width:100%; height:200px;">{transcript}</textarea>
-                            <br><br>
-                            <label for="target_language">Select Target Language for Translation:</label>
-                            <select name="target_language" required>
-                                <option value="en">English</option>
-                                <option value="es">Spanish</option>
-                                <option value="fr">French</option>
-                                <!-- Add more languages as needed -->
-                            </select>
-                            <br><br>
-                            <input type="submit" value="Translate">
-                        </form>
-                    </body>
-                </html>
-            '''
-        except Exception as e:
-            return f'<h2>Error: {e}</h2>'
-    
-    @cherrypy.expose
-    def translate_transcript(self, transcript, target_language):
-        try:
-            translated_text = translate_transcript(transcript, target_language)
-            return f'''
-                <html>
-                    <head><title>Translated Transcript</title></head>
-                    <body>
-                        <h2>Translated Transcript:</h2>
-                        <p>{translated_text}</p>
-                        <form method="get" action="download">
-                            <textarea name="file_content" style="width:100%; height:200px;">{translated_text}</textarea>
-                            <br><br>
-                            <input type="submit" value="Download Translated Text">
-                        </form>
-                    </body>
-                </html>
-            '''
-        except Exception as e:
-            return f'<h2>Error: {e}</h2>'
-    
-    @cherrypy.expose
-    def download(self, file_content):
-        try:
-            file_path = '/tmp/transcript.txt'  # Temporary file path
-            with open(file_path, 'w', encoding='utf-8') as file:
-                file.write(file_content)
-            cherrypy.response.headers['Content-Type'] = 'text/plain'
-            cherrypy.response.headers['Content-Disposition'] = f'attachment; filename="translated_transcript.txt"'
-            return open(file_path, 'r')
-        except Exception as e:
-            return f'<h2>Error: {e}</h2>'
+# Streamlit application UI
+st.title("YouTube Transcript Fetcher")
 
-if __name__ == '__main__':
-    cherrypy.quickstart(TranscriptFetcherApp())
+# URL Input
+url = st.text_input("Enter YouTube URL:")
+if url:
+    # Parse video ID from URL
+    parsed_url = urlparse(url)
+    if "youtu.be" in parsed_url.netloc:
+        video_id = parsed_url.path.lstrip("/")
+    elif "youtube.com" in parsed_url.netloc:
+        video_id = parse_qs(parsed_url.query).get('v', [None])[0]
+    else:
+        st.error("Invalid YouTube URL format")
+        video_id = None
+
+    if video_id:
+        # Fetch video details
+        title, description, thumbnail_url = fetch_video_details(API_KEY, video_id)
+        if title and description:
+            st.subheader(f"Video Title: {title}")
+            st.write(f"Description: {description}")
+            if thumbnail_url:
+                st.image(thumbnail_url, caption="Video Thumbnail")
+
+        # Fetch available languages
+        available_languages = get_available_languages(video_id)
+        selected_language = st.selectbox("Select Preferred Language", available_languages)
+
+        # Fetch Transcript
+        if st.button("Fetch Transcript"):
+            transcript = get_transcript(url, selected_language)
+            if transcript:
+                st.text_area("Transcript", transcript, height=300)
+                # Download Button
+                st.download_button("Download Transcript", transcript, file_name="transcript.txt", mime="text/plain")
+
+                # Translate Section
+                target_language = st.selectbox("Select Target Language for Translation", list(LANGUAGES.values()))
+                if st.button("Translate Transcript"):
+                    translated_text = translate_transcript(transcript, target_language)
+                    if translated_text:
+                        st.text_area("Translated Transcript", translated_text, height=300)
+                        # Download Translated Text Button
+                        st.download_button("Download Translated Transcript", translated_text, file_name="translated_transcript.txt", mime="text/plain")
