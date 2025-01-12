@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LearnEd Chatbot</title>
+  
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0" />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@48,400,1,0" />
+    <style>
+/* Basic styling for the chatbot */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  background: #E3F2FD;
+}
+
+/* Chatbot toggle button styling */
+.chatbot-toggler {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  border: none;
+  border-radius: 40%;
+  width: 60px;
+  height: 60px;
+  font-size: 28px;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, background-color 0.3s;
+  max-width: 60px;
+  max-height: 60px;
+  min-width: 60px;
+  min-height: 60px;
+}
+
+.chatbot-toggler:hover {
+  background: linear-gradient(135deg, #b32ad9, #6d5dfc);
+}
+
+/* Chatbot container styling */
+.chatbot {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3000px;
+  height: 800px;
+  max-width: 90%;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot.show {
+  display: flex;
+}
+
+/* Header styling */
+.chatbot header {
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  color: white;
+  padding: 15px;
+  text-align: center;
+  font-size: 20px;
+  position: relative;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  font-weight: 500;
+}
+
+/* Close button styling */
+.close-btn {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  cursor: pointer;
+  font-size: 22px;
+  color: #fff;
+}
+
+/* Chatbox styling */
+.chatbox {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: #f4f5f7;
+}
+
+.chatbox .chat {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.chatbox .incoming {
+  align-items: flex-start;
+}
+
+.chatbox .incoming .material-symbols-outlined {
+  margin-right: 10px;
+  font-size: 28px;
+  color: #6d5dfc;
+}
+
+.chatbox .incoming p,
+.chatbox .outgoing p {
+  background-color: #e9ecef;
+  padding: 12px;
+  border-radius: 8px;
+  max-width: 75%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 15px;
+}
+
+.chatbox .outgoing {
+  justify-content: flex-end;
+}
+
+.chatbox .outgoing p {
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  color: white;
+}
+
+/* Chat input styling */
+.chat-input {
+  display: flex;
+  border-top: 1px solid #ddd;
+  padding: 15px;
+  background-color: #fff;
+  align-items: center;
+}
+
+.chat-input textarea {
+  flex: 0 1 1200px;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  resize: 10px;
+  height: 45px;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s;
+}
+
+.chat-input textarea:focus {
+  outline: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.chat-input span {
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-left: 15px;
+  font-size: 28px;
+  transition: transform 0.3s;
+}
+
+.chat-input span:hover {
+  transform: scale(1.1);
+}
+
+/* Voice toggle styling */
+.voice-toggle {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid #ddd;
+  background-color: #f4f4f4;
+}
+
+.voice-toggle input {
+  margin-right: 8px;
+}
+
+/* Voice control button styling */
+.voice-controls {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  background-color: #f8f9fa;
+}
+
+.voice-btn {
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s, transform 0.3s;
+}
+
+.voice-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Loading indicator styling */
+.loading {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #6d5dfc;
+  border-radius: 50%;
+  border-top: 2px solid #fff;
+  animation: spin 1s linear infinite;
+}
+.controls {
+  display: flex;
+  justify-content: center;
+  margin: 10px;
+}
+/* Pause button styling */
+#pauseBtn {
+
+  color: white;
+  border-radius: 5px;
+  padding: 10px 15px;
+  cursor: pointer;
+  align-items: center;
+  font-size: 16px;
+  bottom: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, #6d5dfc, #b32ad9);
+  border: none;
+  border-radius: 18%;
+  padding: 8px 12px; /* Match voice-btn padding */
+
+  font-size: 28px;
+  color: white;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, background-color 0.3s;
+
+}
+
+#pauseBtn:hover:enabled {
+  background: linear-gradient(135deg, #b32ad9, #6d5dfc);
+  transform: scale(1.1); /* Match voice-btn hover scale */
+}
+
+#pauseBtn:disabled {
+  background: #f4f5f7;
+  color: #ccc;
+  border: 2px solid #ccc;
+  cursor: not-allowed;
+}
+
+#pauseBtn:focus {
+  outline: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); /* Similar to hover effect for better focus visibility */
+}
+#pauseBtn span.material-symbols-rounded {
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+#pauseBtn:hover span.material-symbols-rounded:enabled {
+  transform: rotate(15deg);
+}
+
+/* Responsive styling */
+@media (max-width: 480px) {
+  .chatbot {
+      width: 90%;
+      height: auto;
+      max-width: 100%;
+  }
+
+  .chatbot header {
+      font-size: 18px;
+  }
+
+  .chat-input textarea {
+      font-size: 15px;
+      width: 100%;
+  }
+
+  .chatbot-toggler {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+  }
+
+  #pauseBtn {
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+  }
+}
+
+
+
+        /* Microphone button */
+        #micBtn {
+            cursor: pointer;
+            color: #ffffff;
+            font-size: 32px;
+            margin-left: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Chatbot Interface -->
+    <div class="chatbot show">
+        <header>
+            <h2>Voice Teacher</h2>
+        </header>
+        <ul class="chatbox">
+            <li class="chat incoming">
+                <span class="material-symbols-outlined">smart_toy</span>
+                <p>Hello! How can I help you today?</p>
+            </li>
+        </ul>
+        <div class="chat-input">
+            <textarea placeholder="Enter a message..." spellcheck="false"></textarea>
+            <span class="material-symbols-rounded">send</span>
+            <span id="micBtn" class="material-symbols-rounded">mic</span>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "@google/generative-ai": "https://esm.run/@google/generative-ai"
+            }
+        }
+    </script>
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+        const genAI = new GoogleGenerativeAI('AIzaSyDBc5rLO2WuHWc7s8tYTt9SL7j97gK_SoI'); // Replace with a secure API key
+        const chatbox = document.querySelector(".chatbox");
+        const chatInput = document.querySelector(".chat-input textarea");
+        const sendChatBtn = document.querySelector(".chat-input span");
+        const micBtn = document.getElementById("micBtn");
+        let userMessage = null;
+        let taskQueue = [];
+        let isProcessing = false;
+        let utterance = null;
+        let recognition;
+        let isListening = false;
+
+        // Function to set up voice synthesis with Hindi support
+        const speakTextInHindi = (text) => {
+            if (speechSynthesis.speaking && !speechSynthesis.paused) {
+                speechSynthesis.cancel(); // Stop any ongoing speech if it's not paused
+            }
+
+            utterance = new SpeechSynthesisUtterance(text);
+
+            // Try to select the Hindi voice (check available voices)
+            const voices = speechSynthesis.getVoices();
+            const hindiVoice = voices.find(voice => voice.lang === 'hi-IN'); // 'hi-IN' is the language code for Hindi
+
+            if (hindiVoice) {
+                utterance.voice = hindiVoice; // Set to Hindi voice
+            } else {
+                // Fallback to default English voice if Hindi is not available
+                utterance.voice = voices.find(voice => voice.lang === 'en-US');
+            }
+
+            speechSynthesis.speak(utterance);
+        };
+
+        // Prevent speech from being canceled when page is hidden or navigated away
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden" && speechSynthesis.speaking) {
+                speechSynthesis.pause();
+            } else if (document.visibilityState === "visible" && speechSynthesis.paused) {
+                speechSynthesis.resume();
+            }
+        });
+
+        // Speak the greeting message when the page loads
+        window.addEventListener("load", () => {
+            speakTextInHindi("नमस्ते! मैं आपकी कैसे मदद कर सकता हूँ?");
+        });
+
+        const processQueue = () => {
+            if (taskQueue.length === 0 || isProcessing) return;
+            isProcessing = true;
+            const { message, chatElement } = taskQueue.shift();
+            generateResponse(chatElement, message).then(() => {
+                isProcessing = false;
+                processQueue();
+            });
+        };
+
+        const createChatLi = (message, className) => {
+            const chatLi = document.createElement("li");
+            chatLi.className = `chat ${className}`;
+            chatLi.innerHTML = className === "incoming" ? `<span class="material-symbols-outlined">smart_toy</span><p>${message}</p>` : `<p>${message}</p>`;
+            return chatLi;
+        };
+
+        const handleChat = () => {
+            userMessage = chatInput.value.trim();
+            if (!userMessage) return;
+
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            taskQueue = [];
+
+            chatInput.value = "";
+            const outgoingChatLi = createChatLi(userMessage, "outgoing");
+            chatbox.appendChild(outgoingChatLi);
+            const incomingChatLi = createChatLi('<span class="loading"></span>', "incoming");
+            chatbox.appendChild(incomingChatLi);
+            taskQueue.push({ message: userMessage, chatElement: incomingChatLi });
+            processQueue();
+        };
+
+        const generateResponse = async (chatElement, userMessage) => {
+            const messageElement = chatElement.querySelector("p");
+            try {
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await model.generateContent(userMessage);
+                let response = result.response.text();
+                response = response.replace(/\*\*/g, '').trim();
+                response = response.replace(/\*/g, '').trim();
+                messageElement.innerHTML = response;
+                speakTextInHindi(response);
+
+            } catch {
+                messageElement.textContent = "Sorry, something went wrong.";
+                speakTextInHindi("Sorry, something went wrong.");
+            }
+        };
+
+        sendChatBtn.addEventListener("click", () => {
+            handleChat();
+        });
+
+        chatInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                handleChat();
+            }
+        });
+
+        // Microphone functionality
+        if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = "en-US";
+            recognition.interimResults = false;
+            recognition.continuous = false;
+
+            micBtn.addEventListener("click", () => {
+                if (isListening) {
+                    recognition.stop();
+                    if (speechSynthesis.paused) {
+                        speechSynthesis.resume();
+                    }
+                } else {
+                    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+                        speechSynthesis.pause();
+                    }
+                    recognition.start();
+                }
+            });
+
+            recognition.addEventListener("start", () => {
+                isListening = true;
+                micBtn.textContent = "mic_off";
+                micBtn.style.color = "#ff0000";
+            });
+
+            recognition.addEventListener("end", () => {
+                isListening = false;
+                micBtn.textContent = "mic";
+                micBtn.style.color = "#ffffff";
+
+                if (speechSynthesis.paused) {
+                    speechSynthesis.resume();
+                }
+            });
+
+            recognition.addEventListener("result", (event) => {
+                const transcript = event.results[0][0].transcript.trim();
+                chatInput.value = transcript;
+                handleChat();
+            });
+
+            recognition.addEventListener("error", (event) => {
+                console.error("Speech recognition error:", event.error);
+                isListening = false;
+                micBtn.textContent = "mic";
+                micBtn.style.color = "#ffffff";
+            });
+        } else {
+            micBtn.disabled = true;
+            micBtn.title = "Microphone not supported in this browser";
+        }
+    </script>
+</body>
+
+</html>
